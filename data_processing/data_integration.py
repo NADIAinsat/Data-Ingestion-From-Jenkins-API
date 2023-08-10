@@ -1,12 +1,29 @@
 from jenkinsapi.custom_exceptions import NotFound
 from jenkins_api import jenkinsAPI
-from data_modeling import Job, Build
+from data_processing.data_modeling import Job, Build
 from sqlalchemy import desc, update
 from data_processing import database_connection
 from sqlalchemy import inspect
+import os
 
 server = jenkinsAPI.server
 session = database_connection.session
+artifacts_path = "C:/Users/nadia/PycharmProjects/DataIngestion/Build Artifacts"
+
+
+def save_build_artifacts(job_name, build_number):
+    # This method saves each build's artifact in its specific path
+    job = server.get_job(job_name)
+    build = job.get_build(build_number)
+    artifacts = list(build.get_artifacts())
+    for artifact in artifacts:
+        artifact_url = artifact.url
+        print(artifact_url)
+        directory_path = f"{artifacts_path}/{job_name}/{build_number}"
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)
+        artifact.save(f"{directory_path}/{artifact.filename}")
+        break
 
 
 def insert_new_build(build_info):
@@ -19,6 +36,7 @@ def insert_new_build(build_info):
             build_inst['job_id'] = existing_job.id
         else:
             build_inst[key] = value
+    save_build_artifacts(build_info['job'], int(build_inst['number']))
     build = Build(**build_inst)
     session.add(build)
     session.commit()
@@ -49,21 +67,20 @@ def update_builds_foreignkey(job_name):
 
 def update_job(existing_job):
     job_inst = jenkinsAPI.get_job_info(existing_job.name)
-    # see if there was any modification in the job info
     inspector = inspect(engine)
     table_columns = inspector.get_columns('Job')
+    is_updated = False
     # Iterate through the columns
     for column in table_columns:
         column_name = column['name']
         if column_name in job_inst and job_inst[column_name] != getattr(existing_job, column_name):
-            to_delete_job = session.query(Job).filter_by(name=str(existing_job.name)).first()
-            job = Job(**job_inst)
-            session.add(job)
-            session.commit()
-            update_builds_foreignkey(existing_job.name)
-            session.delete(to_delete_job)
-            session.commit()
-            break
+            # Update the attributes of the existing job instance
+            setattr(existing_job, column_name, job_inst[column_name])
+            is_updated = True
+    if is_updated:
+        session.commit()
+        update_builds_foreignkey(existing_job.name)
+
     return job_inst
 
 
@@ -116,7 +133,7 @@ def print_builds_after_timestamp(server, timestamp):
                 continue  # Skip this build number if it doesn't exist
 
 
-def insert_dequeued_jobs(server):
+def update_dequeued_jobs(server):
     for job_name, job_instance in server.get_jobs():
         existing_job = session.query(Job).filter_by(name=str(job_instance.name)).first()
         if existing_job is None:
@@ -125,13 +142,10 @@ def insert_dequeued_jobs(server):
             last_inserted_job = session.query(Job).order_by(desc(Job.Insert_Date)).first()
             if (last_inserted_job is not None) and (last_inserted_job.queued == 'True') and (
                     job_instance.is_queued() is False):
-                job_inst = jenkinsAPI.get_job_info(job_name)
-                job = Job(**job_inst)
-                session.add(job)
-                session.commit()
+                update_job(existing_job)
 
 
-def insert_changed_status(server):
+def update_changed_status(server):
     for job_name, job_instance in server.get_jobs():
         job_inst = jenkinsAPI.get_job_info(job_name)
         last_build_number = job_inst['lastBuild']
@@ -145,14 +159,17 @@ def insert_changed_status(server):
             if existing_build is None:
                 continue
             elif build_info['status'] != existing_build.status:
-                session.delete(existing_build)
+                session.execute(
+                    update(Build).
+                    where(Build.build.like(existing_build.build)).
+                    values(status=build_info['status'], duration=build_info['duration'], running=build_info['running'])
+                )
                 session.commit()
-                insert_new_build(build_info)
 
 
-insert_new_jobs_and_builds(server)
-# insert_changed_status(server)
-# insert_dequeued_jobs(server)
+# insert_new_jobs_and_builds(server)
+# update_changed_status(server)
+# update_dequeued_jobs(server)
 
 # Close the session
-session.close()
+# session.close()

@@ -1,11 +1,11 @@
-from jenkins_api import jenkinsAPI
+# from jenkins_api import jenkinsAPI
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 from sqlalchemy.orm import declarative_base, relationship
-import database_connection
+# import database_connection
 
-server = jenkinsAPI.server
-session = database_connection.session
-engine = database_connection.engine
+# server = jenkinsAPI.server
+# session = database_connection.session
+# engine = database_connection.engine
 
 # Create the base class for declarative models
 Base = declarative_base()
@@ -44,7 +44,7 @@ class Build(Base):
 
 
 # Create the tables
-Base.metadata.create_all(engine)
+# Base.metadata.create_all(engine)
 
 # Close the session
-session.close()
+# session.close()

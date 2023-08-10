@@ -1,10 +1,11 @@
 from jenkinsapi.jenkins import Jenkins
-import os
+import config
+
 
 # Jenkins server URL and credentials
-jenkins_url = os.environ.get('jenkins_url')
-jenkins_username = os.environ.get('jenkins_username')
-jenkins_password = os.environ.get('jenkins_password')
+jenkins_url = config.config['Jenkins']['jenkins_url']
+jenkins_username = config.config['Jenkins']['jenkins_username']
+jenkins_password = config.config['Jenkins']['jenkins_password']
 server = Jenkins(jenkins_url, username=jenkins_username, password=jenkins_password)
 
 

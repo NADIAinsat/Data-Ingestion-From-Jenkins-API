@@ -2,11 +2,12 @@
 import pyodbc as odbc
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import config
 
-DRIVER_NAME = 'ODBC Driver 17 for SQL Server'
-SERVER_NAME = 'PC-NADIA\MSSQLSERVER19'
 
-DATABASE_NAME = 'mydb'
+DRIVER_NAME = config.config['Database']['DRIVER_NAME']
+SERVER_NAME = config.config['Database']['SERVER_NAME']
+DATABASE_NAME = config.config['Database']['DATABASE_NAME']
 
 connection_string = f"""
         DRIVER={DRIVER_NAME};
